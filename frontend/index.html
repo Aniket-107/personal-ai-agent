@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AI Planner</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#0f0f13;--surface:#1a1a22;--card:#22222e;--border:#2e2e3e;--accent:#7F77DD;--accent2:#534AB7;--text:#e8e8f0;--muted:#888898;--green:#639922;--amber:#BA7517;--red:#E24B4A}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border)}
+  .logo{font-size:16px;font-weight:600;letter-spacing:-.3px}.logo span{color:var(--accent)}
+  .tabs{display:flex;gap:4px;background:var(--bg);border-radius:8px;padding:3px;border:1px solid var(--border)}
+  .tab{padding:7px 16px;border-radius:6px;font-size:13px;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:.15s}
+  .tab.active{background:var(--card);color:var(--text);font-weight:500;border:1px solid var(--border)}
+  .tab:hover:not(.active){color:var(--text)}
+  .api-badge{font-size:11px;padding:4px 10px;border-radius:20px;background:var(--card);border:1px solid var(--border);color:var(--muted)}
+  .content{flex:1;padding:20px 24px;max-width:900px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .metric{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .metric-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+  .metric-val{font-size:24px;font-weight:600;color:var(--text)}
+  .panel{display:none}.panel.active{display:flex;flex-direction:column;gap:12px}
+  .section-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .chat{display:flex;flex-direction:column;gap:8px;min-height:220px;max-height:340px;overflow-y:auto;padding:4px 0}
+  .msg{padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.55;max-width:82%}
+  .msg.ai{background:var(--card);border:1px solid var(--border);align-self:flex-start}
+  .msg.user{background:var(--accent);color:#fff;align-self:flex-end;border-radius:12px 12px 3px 12px}
+  .input-row{display:flex;gap:8px}
+  .input-row input{flex:1;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:14px}
+  .input-row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(127,119,221,.15)}
+  .send-btn{padding:10px 20px;border-radius:8px;background:var(--accent);color:#fff;border:none;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap}
+  .send-btn:active{transform:scale(.97)}
+  .list{display:flex;flex-direction:column;gap:8px}
+  .item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px}
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .dot.purple{background:var(--accent)}.dot.green{background:var(--green)}.dot.amber{background:var(--amber)}.dot.red{background:var(--red)}
+  .item-body{flex:1}
+  .item-title{font-size:14px;font-weight:500}
+  .item-sub{font-size:12px;color:var(--muted);margin-top:2px}
+  .badge{font-size:11px;padding:3px 10px;border-radius:20px;cursor:pointer;border:1px solid var(--border);white-space:nowrap}
+  .badge.done{background:#1a2e12;color:#7fc44a;border-color:#3b6d11}
+  .badge.prog{background:#1e1b30;color:#9f97e8;border-color:#3C3489}
+  .badge.todo{background:var(--surface);color:var(--muted)}
+  .add-row{display:flex;gap:8px}
+  .add-row input{flex:1;padding:9px 13px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px}
+  .add-row input:focus{outline:none;border-color:var(--accent)}
+  .add-btn{padding:9px 16px;border-radius:8px;background:var(--accent2);color:#fff;border:none;font-size:13px;cursor:pointer;white-space:nowrap}
+  .divider{height:1px;background:var(--border);margin:4px 0}
+  .pill{font-size:11px;padding:2px 8px;border-radius:20px;background:#1e1b30;color:#9f97e8;border:1px solid #3C3489;display:inline-block;margin-top:4px}
+  .typing{display:flex;gap:5px;align-items:center;padding:4px 0}
+  .typing span{width:6px;height:6px;background:var(--muted);border-radius:50%;animation:blink 1.2s infinite}
+  .typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.3}40%{opacity:1}}
+  .empty{color:var(--muted);font-size:13px;padding:16px 0;text-align:center}
+  @media(max-width:600px){.metrics{grid-template-columns:repeat(2,1fr)}.tabs .tab{padding:6px 10px;font-size:12px}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo">AI<span>Planner</span></div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('ai',this)">AI Assistant</button>
+    <button class="tab" onclick="switchTab('calendar',this)">Calendar</button>
+    <button class="tab" onclick="switchTab('tasks',this)">Tasks</button>
+  </div>
+  <div class="api-badge">localhost:5000</div>
+</div>
+
+<div class="content">
+  <div class="metrics">
+    <div class="metric"><div class="metric-label">Events</div><div class="metric-val" id="m-events">0</div></div>
+    <div class="metric"><div class="metric-label">Pending</div><div class="metric-val" id="m-pending">0</div></div>
+    <div class="metric"><div class="metric-label">Done</div><div class="metric-val" id="m-done">0</div></div>
+    <div class="metric"><div class="metric-label">AI Queries</div><div class="metric-val" id="m-ai">0</div></div>
+  </div>
+
+  <div id="panel-ai" class="panel active">
+    <div class="section-label">AI Assistant</div>
+    <div class="chat" id="chat">
+      <div class="msg ai">Hi! I can help you schedule events or manage tasks.<br>Try: <em>"Add a meeting tomorrow at 3pm"</em> or <em>"Create task: Review report"</em></div>
+    </div>
+    <div class="input-row">
+      <input type="text" id="ai-input" placeholder="Ask me anything..." onkeydown="if(event.key==='Enter')sendAI()"/>
+      <button class="send-btn" onclick="sendAI()">Send</button>
+    </div>
+  </div>
+
+  <div id="panel-calendar" class="panel">
+    <div class="section-label">Upcoming Events</div>
+    <div class="list" id="cal-list"><div class="empty">No events yet. Add one below or ask the AI.</div></div>
+    <div class="divider"></div>
+    <div class="add-row">
+      <input type="text" id="ev-title" placeholder="Event title"/>
+      <input type="text" id="ev-time" placeholder="e.g. 2025-04-21T10:00:00"/>
+      <button class="add-btn" onclick="addEvent()">+ Add Event</button>
+    </div>
+  </div>
+
+  <div id="panel-tasks" class="panel">
+    <div class="section-label">Task List</div>
+    <div class="list" id="task-list"><div class="empty">Loading tasks...</div></div>
+    <div class="divider"></div>
+    <div class="add-row">
+      <input type="text" id="task-input" placeholder="New task description..." onkeydown="if(event.key==='Enter')addTask()"/>
+      <button class="add-btn" onclick="addTask()">+ Add Task</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let aiCount = 0;
+let events = [];
+let tasks = [];
+
+async function apiFetch(path, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const r = await fetch(API + path, opts);
+    return await r.json();
+  } catch(e) {
+    return { error: e.message };
+  }
+}
+
+async function loadTasks() {
+  const data = await apiFetch('/tasks');
+  tasks = data.tasks || [];
+  renderTasks();
+}
+
+function renderCalendar() {
+  const l = document.getElementById('cal-list');
+  if (!events.length) { l.innerHTML = '<div class="empty">No events yet.</div>'; return; }
+  const colors = ['purple','green','amber','red'];
+  l.innerHTML = events.map((e,i) => `
+    <div class="item">
+      <div class="dot ${colors[i%colors.length]}"></div>
+      <div class="item-body">
+        <div class="item-title">${e.title}</div>
+        <div class="item-sub">${e.event_time || e.datetime || 'TBD'}</div>
+      </div>
+    </div>`).join('');
+  document.getElementById('m-events').textContent = events.length;
+}
+
+function renderTasks() {
+  const l = document.getElementById('task-list');
+  if (!tasks.length) { l.innerHTML = '<div class="empty">No tasks yet.</div>'; return; }
+  const dot = {done:'green',prog:'purple',todo:'amber'};
+  const label = {done:'Done',prog:'In progress',todo:'To do'};
+  l.innerHTML = tasks.map(t => `
+    <div class="item" id="task-${t.id}">
+      <div class="dot ${dot[t.status]||'amber'}"></div>
+      <div class="item-body"><div class="item-title">${t.title}</div></div>
+      <span class="badge ${t.status}" onclick="cycleStatus(${t.id},'${t.status}')">${label[t.status]||t.status}</span>
+    </div>`).join('');
+  document.getElementById('m-pending').textContent = tasks.filter(t=>t.status!=='done').length;
+  document.getElementById('m-done').textContent = tasks.filter(t=>t.status==='done').length;
+}
+
+async function cycleStatus(id, cur) {
+  const order = ['todo','prog','done'];
+  const next = order[(order.indexOf(cur)+1)%3];
+  const data = await apiFetch(`/tasks/${id}`, 'PATCH', {status: next});
+  if (data.task) {
+    const t = tasks.find(t=>t.id===id);
+    if (t) t.status = next;
+    renderTasks();
+  }
+}
+
+async function addEvent() {
+  const title = document.getElementById('ev-title').value.trim();
+  const time = document.getElementById('ev-time').value.trim();
+  if (!title) return;
+  const data = await apiFetch('/calendar/events', 'POST', {title, description:'', event_time: time||'TBD'});
+  events.push({title, event_time: time||'TBD'});
+  document.getElementById('ev-title').value = '';
+  document.getElementById('ev-time').value = '';
+  renderCalendar();
+  appendMsg(`Event "<strong>${title}</strong>" added to calendar. ${data.status==='mock_success'?'<span class="pill">Simulated</span>':'<span class="pill">Saved</span>'}`, 'ai');
+}
+
+async function addTask(title) {
+  const inp = document.getElementById('task-input');
+  const t = title || inp.value.trim();
+  if (!t) return;
+  const data = await apiFetch('/tasks', 'POST', {title: t});
+  if (data.task) tasks.push(data.task);
+  if (inp) inp.value = '';
+  renderTasks();
+}
+
+function appendMsg(html, cls) {
+  const chat = document.getElementById('chat');
+  const d = document.createElement('div');
+  d.className = `msg ${cls}`;
+  d.innerHTML = html;
+  chat.appendChild(d);
+  chat.scrollTop = chat.scrollHeight;
+  return d;
+}
+
+async function sendAI() {
+  const inp = document.getElementById('ai-input');
+  const val = inp.value.trim();
+  if (!val) return;
+  inp.value = '';
+  appendMsg(val, 'user');
+  aiCount++;
+  document.getElementById('m-ai').textContent = aiCount;
+  const typing = appendMsg('<div class="typing"><span></span><span></span><span></span></div>', 'ai');
+
+  const data = await apiFetch('/ai', 'POST', {message: val});
+  typing.remove();
+
+  if (data.error) {
+    appendMsg(`Error connecting to backend: ${data.error}`, 'ai');
+    return;
+  }
+
+  appendMsg(data.reply + ' <span class="pill">AI</span>', 'ai');
+
+  if (data.action === 'add_event' && data.data) {
+    events.push({title: data.data.title, event_time: data.data.event_time});
+    renderCalendar();
+    await apiFetch('/calendar/events', 'POST', {title: data.data.title, description:'', event_time: data.data.event_time});
+  } else if (data.action === 'add_task' && data.data) {
+    await addTask(data.data.title);
+  } else if (data.action === 'list') {
+    await loadTasks();
+  }
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+loadTasks();
+</script>
+</body>
+</html>
