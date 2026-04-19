@@ -14,10 +14,10 @@ def parse_intent(message: str) -> dict:
     
     Extract the following fields:
     - intent (string)
-    - title (string)
+    - title (string - IMPORTANT: Do NOT abbreviate, do NOT summarize, and do NOT misspell. Use the exact subject words from the user's message.)
     - description (string, optional)
     - priority (string: "high", "medium", "low" - ONLY if intent is Task)
-    - raw_date_string (string - ONLY if intent is Schedule. Extract EXACTLY the words the user used to describe the time. E.g., if they say "next friday at 5pm", output "next friday at 5pm". DO NOT try to convert it to a JSON date format.)
+    - raw_date_string (string - ONLY if intent is Schedule. Extract EXACTLY the words the user used to describe the time. E.g., "next friday at 5pm" or "christmas". DO NOT try to calculate or convert it to a JSON date.)
     
     Message: "{message}"
     
@@ -32,23 +32,23 @@ def parse_intent(message: str) -> dict:
     
     intent_data = json.loads(response.choices[0].message.content)
     
-    # If it's a schedule, use dateparser to convert human words into a strict ISO format
+    # If it's a schedule, use dateparser to convert the raw words into a strict ISO format
     if intent_data.get("intent") == "Schedule":
         raw_date = intent_data.get("raw_date_string", "")
         
-        # dateparser handles "tomorrow", "next week", "in 3 days", "Dec 25th", etc.
+        # dateparser handles "christmas", "tomorrow", "in 3 days", etc. perfectly
         parsed_time = dateparser.parse(
             raw_date, 
-            settings={'PREFER_DATES_FROM': 'future', 'RELATIVE_BASE': None}
+            settings={'PREFER_DATES_FROM': 'future'}
         )
         
         if parsed_time:
-            # Convert the calculated date to the required JSON format
+            # Converts "christmas" into "2024-12-25T00:00:00"
             intent_data['datetime'] = parsed_time.isoformat()
         else:
-            intent_data['datetime'] = None # Fallback if no date was found
+            intent_data['datetime'] = "TBD" # Fallback only if completely unrecognizable
             
-        # Clean up the JSON so we don't send the raw string to the calendar
+        # Remove the raw string so the frontend doesn't get confused
         del intent_data['raw_date_string']
         
     return intent_data
